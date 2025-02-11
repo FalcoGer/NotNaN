@@ -17,26 +17,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    # Set up CMake and other dependencies
-    - name: Set up CMake
-      uses: actions/setup-cmake@v1
-      with:
-        cmake-version: '3.28'  # Specify the desired CMake version
-
     # Install Catch2 dependencies
-    - name: Install dependencies
+    - name: Install Catch2
       run: sudo apt-get install -y catch2
 
-    # Create a build directory and run CMake to configure and build the project
-    - name: Configure and Build
-      run: |
-        mkdir build
-        cd build
-        cmake ..
-        cmake --build .
+    # Build Project
+    - name: Build Project
+      uses: threeal/cmake-action@v2.1.0
+      with:
+        generator: Ninja
+        cxx-compiler: g++
+        build-dir: out/build/gcc
 
     # Run the tests using CTest
     - name: Run Tests
       run: |
-        cd build
+        cd out/build/gcc
         ctest --output-on-failure
