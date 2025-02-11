@@ -1,0 +1,42 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # You can use other environments like macOS or Windows if necessary
+
+    steps:
+    # Checkout the code from the repository
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Set up CMake and other dependencies
+    - name: Set up CMake
+      uses: actions/setup-cmake@v1
+      with:
+        cmake-version: '3.28'  # Specify the desired CMake version
+
+    # Install Catch2 dependencies
+    - name: Install dependencies
+      run: sudo apt-get install -y catch2
+
+    # Create a build directory and run CMake to configure and build the project
+    - name: Configure and Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build .
+
+    # Run the tests using CTest
+    - name: Run Tests
+      run: |
+        cd build
+        ctest --output-on-failure
