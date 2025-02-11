@@ -8,6 +8,7 @@
 #include <cmath>
 #include <concepts>
 #include <limits>
+#include <numeric>
 #include <type_traits>
 #include <utility>
 
@@ -21,124 +22,207 @@
 #pragma GCC diagnostic ignored "-Wfloat-conversion"
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 
-TEMPLATE_TEST_CASE("Type deduction", "[NotNaN]", float, double, long double)
+namespace
 {
-    const NotNaN x {TestType {}};
-    REQUIRE(std::same_as<typename decltype(x)::Type, TestType>);
+template <std::integral T>
+    requires (!std::same_as<bool, T>)
+auto generateTestValues()
+{
+    return GENERATE(
+      // Hand-picked values
+      Catch::Generators::values<T>({
+        T(0),
+        T(1),
+        T(2),
+        T(10),
+        T(-1),
+        T(-2),
+        T(-10),
+        std::numeric_limits<T>::max(),
+        std::numeric_limits<T>::min(),
+      }),
+      // Random values less than -1.0
+      Catch::Generators::take(5, Catch::Generators::random<T>(-100, -1)),
+      // Random values greater than 1.0
+      Catch::Generators::take(5, Catch::Generators::random<T>(1, 100))
+    );
 }
 
-TEMPLATE_TEST_CASE("Assignment", "[NotNaN]", float, double, long double)
+template <std::floating_point T>
+auto generateTestValues()
 {
-    auto       rv = GENERATE(Catch::Generators::take(25, Catch::Generators::random(-10.0, 10.0)));
-    const auto tv = static_cast<TestType>(rv);
+    return GENERATE(
+      // Hand-picked values
+      Catch::Generators::values<T>(
+        {T(1.0),
+         T(0.5),
+         T(0.0),
+         T(-0.0),
+         T(-0.5),
+         T(-1.0),
+         std::numbers::e_v<T> * static_cast<T>(2),
+         std::numbers::e_v<T>,
+         std::numbers::e_v<T> / static_cast<T>(2),
+         -std::numbers::e_v<T> * static_cast<T>(2),
+         -std::numbers::e_v<T>,
+         -std::numbers::e_v<T> / static_cast<T>(2),
+         std::numbers::pi_v<T> * static_cast<T>(2),
+         std::numbers::pi_v<T>,
+         std::numbers::pi_v<T> / static_cast<T>(2),
+         -std::numbers::pi_v<T> * static_cast<T>(2),
+         -std::numbers::pi_v<T>,
+         -std::numbers::pi_v<T> / static_cast<T>(2),
+         std::numeric_limits<T>::epsilon(),
+         -std::numeric_limits<T>::epsilon(),
+         std::numeric_limits<T>::denorm_min(),
+         -std::numeric_limits<T>::denorm_min(),
+         std::numeric_limits<T>::infinity(),
+         -std::numeric_limits<T>::infinity(),
+         std::numeric_limits<T>::quiet_NaN(),
+         -std::numeric_limits<T>::quiet_NaN()}
+      ),
+      // Random values in the range [-1.0, 0.0]
+      Catch::Generators::take(5, Catch::Generators::random<T>(-1.0, 0.0)),
+      // Random values in the range [0.0, 1.0]
+      Catch::Generators::take(5, Catch::Generators::random<T>(0.0, 1.0)),
+      // Random values less than -1.0
+      Catch::Generators::take(5, Catch::Generators::random<T>(-100.0, -1.0)),
+      // Random values greater than 1.0
+      Catch::Generators::take(5, Catch::Generators::random<T>(1.0, 100.0))
+    );
+}
+}    // namespace
+
+#define PAIRS_ARITHMETIC_TO_FLOATING (std::pair<int, float>), (std::pair<int, double>), (std::pair<int, long double>), (std::pair<float, float>), (std::pair<float, double>), (std::pair<float, long double>), (std::pair<double, float>), (std::pair<double, double>), (std::pair<double, long double>), (std::pair<long double, float>), (std::pair<long double, double>), (std::pair<long double, long double>)
+#define PAIRS_FLOATING_TO_FLOATING (std::pair<float, float>), (std::pair<float, double>), (std::pair<float, long double>), (std::pair<double, float>), (std::pair<double, double>), (std::pair<double, long double>), (std::pair<long double, float>), (std::pair<long double, double>), (std::pair<long double, long double>)
+
+TEMPLATE_TEST_CASE("Type deduction", "[NotNaN]", float, double, long double)
+{
+    auto rv = generateTestValues<TestType>();
+    if (std::isnan(rv))
+    {
+        REQUIRE_THROWS(NotNaN {rv});
+    }
+    else
+    {
+        const NotNaN x {rv};
+        REQUIRE(std::same_as<typename decltype(x)::Type, TestType>);
+    }
+}
+
+TEMPLATE_TEST_CASE("Assignment", "[NotNaN]", PAIRS_ARITHMETIC_TO_FLOATING)
+{
+    using T_FROM  = typename TestType::first_type;
+    using T_TO    = typename TestType::second_type;
+
+    const auto tv = generateTestValues<T_FROM>();
 
     SECTION("Copy constructor")
     {
-        SECTION("With arithmetic values")
+        if (std::isnan(tv))
         {
-            NotNaN x {tv};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            NotNaN<float> y {tv};
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(static_cast<TestType>(tv), 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                REQUIRE_THROWS(NotNaN<T_FROM> {tv});
+            }
+            REQUIRE_THROWS(NotNaN<T_TO> {tv});
         }
-        SECTION("With NotNaN values")
+        else
         {
-            NotNaN x {tv};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            NotNaN y {x};
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(tv, 0.0001));
-            REQUIRE(std::same_as<typename decltype(y)::Type, typename decltype(x)::Type>);
-            NotNaN<float> z {x};    // not same type by design
-            REQUIRE_THAT(*z, Catch::Matchers::WithinAbs(static_cast<float>(tv), 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                NotNaN<T_FROM> from {tv};
+                REQUIRE_THAT(*from, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+                NotNaN<T_TO> to1 {from};
+                REQUIRE_THAT(*to1, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            }
+            NotNaN<T_TO> to2 {tv};
+            REQUIRE_THAT(*to2, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
         }
     }
     SECTION("Move constructor")
     {
-        SECTION("With arithmetic values")
+        T_FROM copy = tv;
+        if (std::isnan(tv))
         {
-            NotNaN x {std::move(tv)};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            REQUIRE(std::same_as<typename decltype(x)::Type, TestType>);
-            NotNaN<float> y {std::move(tv)};    // not same type by design
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(static_cast<float>(tv), 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                REQUIRE_THROWS(NotNaN<T_FROM> {std::move(copy)});
+                copy = tv;
+            }
+            REQUIRE_THROWS(NotNaN<T_TO> {std::move(copy)});
+            copy = tv;
         }
-        SECTION("With NotNaN values")
+        else
         {
-            NotNaN x {tv};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            NotNaN y {std::move(x)};
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(tv, 0.0001));
-            REQUIRE(std::same_as<typename decltype(y)::Type, typename decltype(x)::Type>);
-            NotNaN<float> z {std::move(x)};    // not same type by design
-            REQUIRE_THAT(*z, Catch::Matchers::WithinAbs(static_cast<float>(tv), 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                NotNaN<T_FROM> from {std::move(copy)};
+                copy = tv;
+                REQUIRE_THAT(*from, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+                NotNaN<T_TO> to1 {std::move(from)};
+                REQUIRE_THAT(*to1, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            }
+            NotNaN<T_TO> to2 {std::move(copy)};
+            copy = tv;
+            REQUIRE_THAT(*to2, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
         }
     }
     SECTION("Copy assignment")
     {
-        SECTION("With arithmetic values")
+        NotNaN<T_TO> x {-1'000};
+        REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(-1'000, 0.0001));
+        if (!std::isnan(tv))
         {
-            NotNaN<TestType> x {static_cast<TestType>(0.0)};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<TestType>(0.0), 0.0001));
             x = tv;
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            NotNaN<float> y {static_cast<float>(0.0)};
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(0.F, 0.0001));
-            y = tv;
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(static_cast<float>(tv), 0.0001));
-        }
-        SECTION("With NotNaN values")
-        {
-            NotNaN<TestType> x {static_cast<TestType>(0.0)};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<TestType>(0.0), 0.0001));
-            const NotNaN y {tv};
-            x = y;
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            REQUIRE(std::same_as<typename decltype(x)::Type, typename decltype(y)::Type>);
-        }
-        SECTION("With Self")
-        {
-            NotNaN x {tv};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            x = -1'000;
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(-1'000, 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                NotNaN<T_FROM> from {tv};
+                x = from;
+                REQUIRE_THAT(*from, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+                REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            }
+            x = tv;
             x = x;
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
         }
     }
     SECTION("Move assignment")
     {
-        SECTION("With arithmetic values")
+        T_FROM       copy {tv};
+        NotNaN<T_TO> x {-1'000};
+        REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(-1'000, 0.0001));
+        if (!std::isnan(tv))
         {
-            NotNaN<TestType> x {static_cast<TestType>(0.0)};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<TestType>(0.0), 0.0001));
-            x = std::move(tv);
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            NotNaN<float> y {static_cast<float>(0.0)};
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(static_cast<float>(0.0), 0.0001));
-            y = std::move(tv);
-            REQUIRE_THAT(*y, Catch::Matchers::WithinAbs(static_cast<float>(tv), 0.0001));
-        }
-        SECTION("With NotNaN values")
-        {
-            NotNaN<TestType> x {static_cast<TestType>(0.0)};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<TestType>(0.0), 0.0001));
-            const NotNaN y {tv};
-            x = std::move(y);
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
-            REQUIRE(std::same_as<typename decltype(x)::Type, typename decltype(y)::Type>);
-        }
-        SECTION("With Self")
-        {
-            NotNaN x {tv};
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
+            x    = std::move(copy);
+            copy = tv;
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            x = -1'000;
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(-1'000, 0.0001));
+            if constexpr (!std::integral<T_FROM>)
+            {
+                NotNaN<T_FROM> from {tv};
+                x = std::move(from);
+                REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
+            }
+            x = tv;
             x = std::move(x);
-            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
+            REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(static_cast<T_TO>(tv), 0.0001));
         }
     }
 }
 
 TEMPLATE_TEST_CASE("Conversions", "[NotNaN]", float, double, long double)
 {
-    auto         gv = GENERATE(-4, 0, 1, 62);
-    const auto   tv = static_cast<TestType>(gv);
+    const TestType tv = generateTestValues<TestType>();
+    if (std::isnan(tv))
+    {
+        REQUIRE_THROWS(NotNaN {tv});
+        return;    // no need to test further
+    }
 
     const NotNaN x {tv};
     SECTION("To bool")
@@ -148,6 +232,10 @@ TEMPLATE_TEST_CASE("Conversions", "[NotNaN]", float, double, long double)
     SECTION("To int")
     {
         REQUIRE(static_cast<int>(tv) == static_cast<int>(x));
+    }
+    SECTION("To uint")
+    {
+        REQUIRE(static_cast<unsigned>(tv) == static_cast<unsigned>(x));
     }
     SECTION("To float")
     {
@@ -163,50 +251,36 @@ TEMPLATE_TEST_CASE("Conversions", "[NotNaN]", float, double, long double)
     }
 }
 
-TEMPLATE_TEST_CASE("Comparison", "[NotNaN]", float, double, long double)
+TEMPLATE_TEST_CASE("Comparison", "[NotNaN]", PAIRS_ARITHMETIC_TO_FLOATING)
 {
-    auto         gv  = GENERATE(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5);
-    auto         gv2 = GENERATE(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5);
-    const auto   tv  = static_cast<TestType>(gv);
+    using T1 = typename TestType::first_type;
+    using T2 = typename TestType::second_type;
+
+    T1 cv    = generateTestValues<T1>();
+    T2 tv    = generateTestValues<T2>();
+
+    if (std::isnan(tv))
+    {
+        REQUIRE_THROWS(NotNaN {tv});
+        return;
+    }
 
     const NotNaN x {tv};
     REQUIRE_THAT(*x, Catch::Matchers::WithinAbs(tv, 0.0001));
 
     SECTION("NotNaN lhs")
     {
-        SECTION("With int")
+        if (std::isnan(cv))
         {
-            auto cv = static_cast<int>(gv2);
-            REQUIRE((x == cv) == (tv == cv));
-            REQUIRE((x != cv) == (tv != cv));
-            REQUIRE((x < cv) == (tv < cv));
-            REQUIRE((x > cv) == (tv > cv));
-            REQUIRE((x <= cv) == (tv <= cv));
-            REQUIRE((x >= cv) == (tv >= cv));
+            REQUIRE_THROWS(x == cv);
+            REQUIRE_THROWS(x != cv);
+            REQUIRE_THROWS(x < cv);
+            REQUIRE_THROWS(x > cv);
+            REQUIRE_THROWS(x <= cv);
+            REQUIRE_THROWS(x >= cv);
         }
-        SECTION("With float")
+        else
         {
-            auto cv = static_cast<float>(gv2);
-            REQUIRE((x == cv) == (tv == cv));
-            REQUIRE((x != cv) == (tv != cv));
-            REQUIRE((x < cv) == (tv < cv));
-            REQUIRE((x > cv) == (tv > cv));
-            REQUIRE((x <= cv) == (tv <= cv));
-            REQUIRE((x >= cv) == (tv >= cv));
-        }
-        SECTION("With double")
-        {
-            auto cv = static_cast<double>(gv2);
-            REQUIRE((x == cv) == (tv == cv));
-            REQUIRE((x != cv) == (tv != cv));
-            REQUIRE((x < cv) == (tv < cv));
-            REQUIRE((x > cv) == (tv > cv));
-            REQUIRE((x <= cv) == (tv <= cv));
-            REQUIRE((x >= cv) == (tv >= cv));
-        }
-        SECTION("With long double")
-        {
-            auto cv = static_cast<long double>(gv2);
             REQUIRE((x == cv) == (tv == cv));
             REQUIRE((x != cv) == (tv != cv));
             REQUIRE((x < cv) == (tv < cv));
@@ -217,39 +291,17 @@ TEMPLATE_TEST_CASE("Comparison", "[NotNaN]", float, double, long double)
     }
     SECTION("NotNaN rhs")
     {
-        SECTION("With int")
+        if (std::isnan(cv))
         {
-            auto cv = static_cast<int>(gv2);
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
+            REQUIRE_THROWS(cv == x);
+            REQUIRE_THROWS(cv != x);
+            REQUIRE_THROWS(cv < x);
+            REQUIRE_THROWS(cv > x);
+            REQUIRE_THROWS(cv <= x);
+            REQUIRE_THROWS(cv >= x);
         }
-        SECTION("With float")
+        else
         {
-            auto cv = static_cast<float>(gv2);
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
-        }
-        SECTION("With double")
-        {
-            auto cv = static_cast<double>(gv2);
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
-        }
-        SECTION("With long double")
-        {
-            auto cv = static_cast<long double>(gv2);
             REQUIRE((cv == x) == (cv == tv));
             REQUIRE((cv != x) == (cv != tv));
             REQUIRE((cv < x) == (cv < tv));
@@ -258,37 +310,24 @@ TEMPLATE_TEST_CASE("Comparison", "[NotNaN]", float, double, long double)
             REQUIRE((cv >= x) == (cv >= tv));
         }
     }
-    SECTION("With NotNaN Types lhs and rhs")
+    if constexpr (std::floating_point<T1>)
     {
-        SECTION("With float")
+        if (std::isnan(cv))
         {
-            NotNaN<float> cv {static_cast<float>(gv2)};
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
+            REQUIRE_THROWS(NotNaN {cv});
         }
-        SECTION("With double")
+        else
         {
-            NotNaN<double> cv {static_cast<double>(gv2)};
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
-        }
-        SECTION("With long double")
-        {
-            NotNaN<long double> cv {static_cast<long double>(gv2)};
-            REQUIRE((cv == x) == (cv == tv));
-            REQUIRE((cv != x) == (cv != tv));
-            REQUIRE((cv < x) == (cv < tv));
-            REQUIRE((cv > x) == (cv > tv));
-            REQUIRE((cv <= x) == (cv <= tv));
-            REQUIRE((cv >= x) == (cv >= tv));
+            const NotNaN cvnn {cv};
+            SECTION("With NotNaN Types lhs and rhs")
+            {
+                REQUIRE((cvnn == x) == (cv == tv));
+                REQUIRE((cvnn != x) == (cv != tv));
+                REQUIRE((cvnn < x) == (cv < tv));
+                REQUIRE((cvnn > x) == (cv > tv));
+                REQUIRE((cvnn <= x) == (cv <= tv));
+                REQUIRE((cvnn >= x) == (cv >= tv));
+            }
         }
     }
 }
@@ -407,11 +446,15 @@ TEMPLATE_TEST_CASE("NotNaN Exceptions", "[NotNaN]", float, double, long double)
         }
     }
 }
-TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
+TEMPLATE_TEST_CASE("Special Functions Self Only", "[NotNaN]", float, double, long double)
 {
-    auto       rv = GENERATE(Catch::Generators::take(100, Catch::Generators::random(-10.0, 10.0)));
-    const auto tv = static_cast<TestType>(rv);
-    NotNaN     x {tv};
+    const auto tv = generateTestValues<TestType>();
+    if (std::isnan(tv))
+    {
+        REQUIRE_THROWS(NotNaN {tv});
+        return;
+    }
+    NotNaN x {tv};
 
     SECTION("Powers")
     {
@@ -433,21 +476,6 @@ TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
         else
         {
             REQUIRE_THAT(*x.cbrt(), Catch::Matchers::WithinAbs(std::cbrt(tv), 0.0001));
-        }
-
-        SECTION("POW")
-        {
-            TestType exp = GENERATE(Catch::Generators::take(10, Catch::Generators::random(-5, 5)));
-            if (std::isnan(std::pow(tv, exp)))
-            {
-                REQUIRE_THROWS(x.pow(exp));
-                REQUIRE_THROWS(x.pow(NotNaN{exp}));
-            }
-            else
-            {
-                REQUIRE_THAT(*x.pow(exp), Catch::Matchers::WithinAbs(std::pow(tv, exp), 0.0001));
-                REQUIRE_THAT(*x.pow(NotNaN{exp}), Catch::Matchers::WithinAbs(std::pow(tv, exp), 0.0001));
-            }
         }
 
         // exp
@@ -521,22 +549,6 @@ TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
         {
             REQUIRE_THAT(*x.log1p(), Catch::Matchers::WithinAbs(std::log1p(tv), 0.0001));
         }
-
-        // logBase (logarithm with a random base)
-        SECTION("LogBase")
-        {
-            TestType base = GENERATE(Catch::Generators::take(10, Catch::Generators::random(-10.0, 10.0)));
-            if (std::isnan(std::log(tv) / std::log(base)))
-            {
-                REQUIRE_THROWS(x.logBase(base));
-                REQUIRE_THROWS(x.logBase(NotNaN{base}));
-            }
-            else
-            {
-                REQUIRE_THAT(*x.logBase(base), Catch::Matchers::WithinAbs(std::log(tv) / std::log(base), 0.0001));
-                REQUIRE_THAT(*x.logBase(NotNaN{base}), Catch::Matchers::WithinAbs(std::log(tv) / std::log(base), 0.0001));
-            }
-        }
     }
 
     SECTION("Trigonometry")
@@ -552,6 +564,10 @@ TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
         }
         // cos
         if (std::isnan(std::cos(tv)))
+        {
+            REQUIRE_THROWS(x.cos());
+        }
+        else
         {
             REQUIRE_THAT(*x.cos(), Catch::Matchers::WithinAbs(std::cos(tv), 0.0001));
         }
@@ -593,35 +609,6 @@ TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
         else
         {
             REQUIRE_THAT(*x.atan(), Catch::Matchers::WithinAbs(std::atan(tv), 0.0001));
-        }
-
-        SECTION("atan2")
-        {
-            TestType y = GENERATE(Catch::Generators::take(10, Catch::Generators::random(-10.0, 10.0)));
-            if (std::isnan(std::atan2(tv, y)))
-            {
-                REQUIRE_THROWS(x.atan2(y));
-                REQUIRE_THROWS(x.atan2(NotNaN{y}));
-            }
-            else
-            {
-                REQUIRE_THAT(*x.atan2(y), Catch::Matchers::WithinAbs(std::atan2(tv, y), 0.0001));
-                REQUIRE_THAT(*x.atan2(NotNaN(y)), Catch::Matchers::WithinAbs(std::atan2(tv, y), 0.0001));
-            }
-        }
-        SECTION("hypot")
-        {
-            TestType y = GENERATE(Catch::Generators::take(10, Catch::Generators::random(-10.0, 10.0)));
-            if (std::isnan(std::hypot(tv, y)))
-            {
-                REQUIRE_THROWS(x.hypot(y));
-                REQUIRE_THROWS(x.hypot(NotNaN{y}));
-            }
-            else
-            {
-                REQUIRE_THAT(*x.hypot(y), Catch::Matchers::WithinAbs(std::hypot(tv, y), 0.0001));
-                REQUIRE_THAT(*x.hypot(NotNaN(y)), Catch::Matchers::WithinAbs(std::hypot(tv, y), 0.0001));
-            }
         }
     }
 
@@ -685,34 +672,190 @@ TEMPLATE_TEST_CASE("Special Functions", "[NotNaN]", float, double, long double)
         // abs
         REQUIRE_THAT(*x.abs(), Catch::Matchers::WithinAbs(std::abs(tv), 0.0001));
 
-        SECTION("MODPOINT")
-        {
-            TestType y = GENERATE(Catch::Generators::take(10, Catch::Generators::random(-100.0, 100.0)));
-            NotNaN other {static_cast<TestType>(y)};
-            REQUIRE_THAT(*x.midpoint(other), Catch::Matchers::WithinAbs(std::midpoint(tv, y), 0.0001));
-        }
-
         // modf
-        NotNaN<TestType> integralPart{0.0};
-        NotNaN<TestType> fractionalPart = x.modf(&integralPart);
+        NotNaN<TestType> integralPart {0.0};
 
         TestType         integralPartCheck;
-        TestType fractionalPartCheck = std::modf(tv, &integralPartCheck);
+        TestType         fractionalPartCheck = std::modf(tv, &integralPartCheck);
 
-        REQUIRE_THAT(*integralPart, Catch::Matchers::WithinAbs(integralPartCheck, 0.0001));
-        REQUIRE_THAT(*fractionalPart, Catch::Matchers::WithinAbs(fractionalPartCheck, 0.0001));
+        if (std::isnan(integralPartCheck) || std::isnan(fractionalPartCheck))
+        {
+            REQUIRE_THROWS(x.modf(&integralPart));
+        }
+        else
+        {
+            NotNaN<TestType> fractionalPart = x.modf(&integralPart);
+            REQUIRE_THAT(*integralPart, Catch::Matchers::WithinAbs(integralPartCheck, 0.0001));
+            REQUIRE_THAT(*fractionalPart, Catch::Matchers::WithinAbs(fractionalPartCheck, 0.0001));
+        }
+    }
+}
+
+TEMPLATE_TEST_CASE("Special Functions With Value", "[NotNaN]", PAIRS_ARITHMETIC_TO_FLOATING)
+{
+    using T1      = typename TestType::first_type;
+    using T2      = typename TestType::second_type;
+    using CT      = std::common_type_t<T1, T2>;
+
+    T2 selfVal    = generateTestValues<T2>();
+    T1 operandVal = generateTestValues<T1>();
+
+    INFO("SelfVal = " << selfVal << "\nOperandVal = " << operandVal);
+    INFO("CT: " << typeid(CT).name());
+    INFO("selfVal type: " << typeid(selfVal).name());
+    INFO("operandVal type: " << typeid(operandVal).name());
+
+    if (std::isnan(selfVal))
+    {
+        REQUIRE_THROWS(NotNaN<T2> {selfVal});
+        return;
+    }
+
+    NotNaN<T2> self {selfVal};
+
+    SECTION("With Arithmetic type as operand")
+    {
+        {
+            auto cmpVal = std::pow(static_cast<CT>(selfVal), static_cast<CT>(operandVal));
+            // idk wtf is going on here.
+            if (std::isnan(operandVal))
+            {
+                // workaround for weird bug
+                cmpVal = std::numeric_limits<CT>::quiet_NaN();
+            }
+            INFO("cmpVal (" << selfVal << " ** " << operandVal << ") = " << cmpVal);
+            if (std::isnan(cmpVal))
+            {
+                REQUIRE_THROWS(self.pow(operandVal));
+            }
+            else
+            {
+                REQUIRE_THAT(*self.pow(operandVal), Catch::Matchers::WithinAbs(cmpVal, 0.0001));
+            }
+        }
+
+        if (std::isnan(std::log(static_cast<CT>(selfVal)) / std::log(static_cast<CT>(operandVal))))
+        {
+            REQUIRE_THROWS(self.logBase(operandVal));
+        }
+        else
+        {
+            REQUIRE_THAT(
+              *self.logBase(operandVal),
+              Catch::Matchers::WithinAbs(std::log(static_cast<CT>(selfVal)) / std::log(static_cast<CT>(operandVal)), 0.0001)
+            );
+        }
+
+        if (std::isnan(std::atan2(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+        {
+            REQUIRE_THROWS(self.atan2(operandVal));
+        }
+        else
+        {
+            REQUIRE_THAT(*self.atan2(operandVal), Catch::Matchers::WithinAbs(std::atan2(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001));
+        }
+
+        if (std::isnan(std::hypot(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+        {
+            REQUIRE_THROWS(self.hypot(operandVal));
+        }
+        else
+        {
+            REQUIRE_THAT(*self.hypot(operandVal), Catch::Matchers::WithinAbs(std::hypot(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001));
+        }
+        if (std::isnan(std::midpoint(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+        {
+            REQUIRE_THROWS(self.midpoint(operandVal));
+        }
+        else
+        {
+            REQUIRE_THAT(
+              *self.midpoint(operandVal),
+              Catch::Matchers::WithinAbs(std::midpoint(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001)
+            );
+        }
+    }
+
+    if constexpr (std::floating_point<T1>)
+    {
+        SECTION("With NotNaN as operand")
+        {
+            if (std::isnan(operandVal))
+            {
+                REQUIRE_THROWS(NotNaN<T1> {operandVal});
+                return;
+            }
+            NotNaN<T1> operand {operandVal};
+
+            if (std::isnan(std::pow(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+            {
+                REQUIRE_THROWS(self.pow(operand));
+            }
+            else
+            {
+                REQUIRE_THAT(*self.pow(operand), Catch::Matchers::WithinAbs(std::pow(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001));
+            }
+
+            if (std::isnan(std::log(static_cast<CT>(selfVal)) / std::log(static_cast<CT>(operandVal))))
+            {
+                REQUIRE_THROWS(self.logBase(operand));
+            }
+            else
+            {
+                REQUIRE_THAT(
+                  *self.logBase(operand), Catch::Matchers::WithinAbs(std::log(static_cast<CT>(selfVal)) / std::log(static_cast<CT>(operandVal)), 0.0001)
+                );
+            }
+
+            if (std::isnan(std::atan2(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+            {
+                REQUIRE_THROWS(self.atan2(operand));
+            }
+            else
+            {
+                REQUIRE_THAT(*self.atan2(operand), Catch::Matchers::WithinAbs(std::atan2(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001));
+            }
+
+            if (std::isnan(std::hypot(selfVal, operandVal)))
+            {
+                REQUIRE_THROWS(self.hypot(operand));
+            }
+            else
+            {
+                REQUIRE_THAT(*self.hypot(operand), Catch::Matchers::WithinAbs(std::hypot(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001));
+            }
+
+            using CT = std::common_type_t<T1, T2>;
+            if (std::isnan(std::midpoint(static_cast<CT>(selfVal), static_cast<CT>(operandVal))))
+            {
+                REQUIRE_THROWS(self.midpoint(operand));
+            }
+            else
+            {
+                REQUIRE_THAT(
+                  *self.midpoint(operand),
+                  Catch::Matchers::WithinAbs(std::midpoint(static_cast<CT>(selfVal), static_cast<CT>(operandVal)), 0.0001)
+                );
+            }
+        }
     }
 }
 
 TEMPLATE_TEST_CASE("Unary Ops", "[NotNaN]", float, double, long double)
 {
-    auto       rv = GENERATE(Catch::Generators::take(100, Catch::Generators::random(-100, 100)));
-    const auto tv = static_cast<TestType>(rv);
-    NotNaN     x {tv};
+    const TestType tv = generateTestValues<TestType>();
+    if (std::isnan(tv))
+    {
+        REQUIRE_THROWS(NotNaN {tv});
+        return;
+    }
+
+    NotNaN         x {tv};
     REQUIRE(std::same_as<typename decltype(x)::Type, TestType>);
     REQUIRE_THAT(static_cast<TestType>(-x), Catch::Matchers::WithinAbs(-tv, 0.0001));
     REQUIRE_THAT(static_cast<TestType>(+x), Catch::Matchers::WithinAbs(+tv, 0.0001));
-    REQUIRE_THAT(static_cast<TestType>(!x), Catch::Matchers::WithinAbs(!tv, 0.0001));
+    REQUIRE(std::same_as<decltype(!x), bool>);
+    REQUIRE(!x == !tv);
 }
 
 TEMPLATE_TEST_CASE("Binary Ops", "[NotNaN]", float, double, long double)
