@@ -22,8 +22,8 @@ jobs:
       run: sudo apt-get install -y catch2
 
     # Install ninja generator
-    - name: Install Catch2
-      run: sudo apt-get install -y ninja
+    - name: Install Ninja
+      run: sudo apt-get install -y ninja-build
 
     # Build Project
     - name: Build Project
