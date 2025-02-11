@@ -1,0 +1,37 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "clang",
+            "displayName": "Clang",
+            "description": "Using compilers: C = /usr/bin/clang, CXX = /usr/bin/clang++",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "hidden": false,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "/usr/bin/clang",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -std=c23",
+                "CMAKE_CXX_FLAGS": "-std=c++23 -stdlib=libc++ -fexperimental-library -flto=full -fvirtual-function-elimination -march=native -Wall -Wextra -Wpedantic -Wdouble-promotion -Wformat=2 -Wformat-nonliteral -Wformat-y2k -Wnull-dereference -Wimplicit-fallthrough -Wmissing-include-dirs -Wswitch -Wswitch-bool -Wcovered-switch-default -Wunused-parameter -Wuninitialized -Walloca -Wconversion -Wfloat-conversion -Wsign-conversion -Wfloat-equal -Wshadow-all -Wundef -Wunused-macros -Wcast-qual -Wcast-align -Wmissing-declarations -Wredundant-decls -Wstack-protector -fstack-protector -pedantic-errors -Werror=pedantic -Werror=char-subscripts -Werror=null-dereference -Werror=dangling-gsl -Werror=init-self -Werror=switch -Werror=implicit-fallthrough -Werror=misleading-indentation -Werror=missing-braces -Werror=sequence-point -Werror=return-type -Werror=multichar"
+            }
+        },
+        {
+            "name": "gcc",
+            "displayName": "GCC",
+            "description": "Using compilers: C = /usr/local/bin/gcc, CXX = /usr/local/bin/g++",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "hidden": false,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "/usr/local/bin/gcc",
+                "CMAKE_CXX_COMPILER": "/usr/local/bin/g++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-Wall -Wextra -Wpedantic -std=c23",
+                "CMAKE_CXX_FLAGS": "-std=c++23 -flto -fuse-linker-plugin -lstdc++exp -fuse-ld=gold -march=native -Wall -Wextra -Wpedantic -Wdouble-promotion -Wformat=2 -Wformat-nonliteral -Wformat-signedness -Wformat-y2k -Wnull-dereference -Wimplicit-fallthrough=2 -Wmissing-include-dirs -Wswitch -Wswitch-default -Wswitch-enum -Wunused-parameter -Wuninitialized -Wsuggest-attribute=const -Walloc-zero -Walloca -Wconversion -Wfloat-conversion -Wsign-conversion -Wduplicated-branches -Wduplicated-cond -Wtrampolines -Wfloat-equal -Wshadow=compatible-local -Wundef -Wunused-macros -Wcast-qual -Wcast-align=strict -Wlogical-op -Wmissing-declarations -Wredundant-decls -Wstack-protector -fstack-protector -pedantic-errors -Werror=pedantic -Werror=char-subscripts -Werror=null-dereference -Werror=init-self -Werror=implicit-fallthrough=2 -Werror=switch -Werror=switch-enum -Werror=misleading-indentation -Werror=missing-braces -Werror=multistatement-macros -Werror=sequence-point -Werror=return-type -Werror=multichar"
+            }
+        }
+    ]
+}
