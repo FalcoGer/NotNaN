@@ -1,9 +1,7 @@
 name: Build and Test
 
 on:
-  push:
-    branches:
-      - master
+  push
   pull_request:
     branches:
       - master
@@ -36,4 +34,6 @@ jobs:
     # Run Tests
     - name: Test Project
       uses: threeal/ctest-action@v1.1.0
+      with:
+        test-dir: out/build/gcc
 
