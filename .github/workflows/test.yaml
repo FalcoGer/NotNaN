@@ -21,6 +21,12 @@ jobs:
     - name: Install Catch2
       run: sudo apt-get install -y catch2
 
+    # Install GCC
+    - name: Setup GCC
+      uses: Dup4/actions-setup-gcc@v1
+      with:
+      version: latest
+
     # Install ninja generator
     - name: Install Ninja
       run: sudo apt-get install -y ninja-build
