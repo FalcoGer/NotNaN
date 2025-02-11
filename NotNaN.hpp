@@ -371,7 +371,7 @@ class NotNaN
         using CT = std::common_type_t<T, std::remove_cvref_t<decltype(rhs)>>;
         if (std::isnan(rhs))
         {
-            throw std::invalid_argument(std::format("Can not compare with {}", rhs));
+            throw std::invalid_argument(std::format("Can not raise to the power of {}", rhs));
         }
         return NotNaN<CT> {std::pow(static_cast<CT>(m_value), static_cast<CT>(rhs))};
     }
