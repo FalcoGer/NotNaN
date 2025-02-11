@@ -4,6 +4,7 @@
 #include <concepts>
 #include <format>
 #include <functional>
+#include <numeric>
 #include <ostream>
 #include <stdexcept>
 #include <type_traits>
@@ -347,6 +348,262 @@ class NotNaN
     constexpr auto operator!() const noexcept -> bool
     {
         return !static_cast<bool>(m_value);
+    }
+
+    // special functions
+    // logs and powers
+
+    [[nodiscard]]
+    constexpr auto sqrt() const -> NotNaN
+    {
+        return NotNaN {std::sqrt(m_value)};
+    }
+    [[nodiscard]]
+    constexpr auto cbrt() const -> NotNaN
+    {
+        return NotNaN {std::cbrt(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto pow(const auto& rhs) const
+        requires std::is_arithmetic_v<std::remove_cvref_t<decltype(rhs)>>
+    {
+        using CT = std::common_type_t<T, std::remove_cvref_t<decltype(rhs)>>;
+        if (std::isnan(rhs))
+        {
+            throw std::invalid_argument(std::format("Can not compare with {}", rhs));
+        }
+        return NotNaN<CT> {std::pow(static_cast<CT>(m_value), static_cast<CT>(rhs))};
+    }
+
+    template <std::floating_point F>
+    [[nodiscard]]
+    constexpr auto pow(const NotNaN<F>& rhs) const
+    {
+        using CT = std::common_type_t<T, F>;
+        return NotNaN<CT> {std::pow(static_cast<CT>(m_value), static_cast<CT>(rhs))};
+    }
+
+    // natural log (base e)
+    [[nodiscard]]
+    constexpr auto log() const -> NotNaN
+    {
+        return NotNaN {std::log(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto log2() const -> NotNaN
+    {
+        return NotNaN {std::log2(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto log10() const -> NotNaN
+    {
+        return NotNaN {std::log10(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto logBase(const auto& base)
+        requires std::is_arithmetic_v<std::remove_cvref_t<decltype(base)>>
+    {
+        using CT = std::common_type_t<T, std::remove_cvref_t<decltype(base)>>;
+        if (std::isnan(base))
+        {
+            throw std::invalid_argument(std::format("Base is {}", base));
+        }
+        return NotNaN<CT> {std::log(static_cast<CT>(m_value)) / std::log(static_cast<CT>(base))};
+    }
+
+    template <typename F>
+    [[nodiscard]]
+    constexpr auto logBase(const NotNaN<F>& base)
+    {
+        using CT = std::common_type_t<T, F>;
+        return NotNaN<CT> {std::log(static_cast<CT>(m_value)) / std::log(static_cast<CT>(base))};
+    }
+
+    [[nodiscard]]
+    constexpr auto log1p() const -> NotNaN
+    {
+        return NotNaN {std::log1p(m_value)};
+    }
+
+    // e ^ m_value
+    [[nodiscard]]
+    constexpr auto exp() const -> NotNaN
+    {
+        return NotNaN {std::exp(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto exp2() const -> NotNaN
+    {
+        return NotNaN {std::exp2(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto expm1() const -> NotNaN
+    {
+        return NotNaN {std::expm1(m_value)};
+    }
+
+    // values and rounding
+
+    [[nodiscard]]
+    constexpr auto abs() const -> NotNaN
+    {
+        return NotNaN {std::abs(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto floor() const -> NotNaN
+    {
+        return NotNaN {std::floor(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto ceil() const -> NotNaN
+    {
+        return NotNaN {std::ceil(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto round() const -> NotNaN
+    {
+        return NotNaN {std::round(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto modf(NotNaN<T>* const iptr) const -> NotNaN
+    {
+        T integralPart;
+        T fractionalPart = std::modf(m_value, &integralPart);
+        *iptr            = NotNaN(integralPart);
+        return NotNaN {fractionalPart};
+    }
+
+    // trigonometry
+
+    [[nodiscard]]
+    constexpr auto sin() const -> NotNaN
+    {
+        return NotNaN {std::sin(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto cos() const -> NotNaN
+    {
+        return NotNaN {std::cos(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto tan() const -> NotNaN
+    {
+        return NotNaN {std::tan(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto asin() const -> NotNaN
+    {
+        return NotNaN {std::asin(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto acos() const -> NotNaN
+    {
+        return NotNaN {std::acos(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto atan() const -> NotNaN
+    {
+        return NotNaN {std::atan(m_value)};
+    }
+
+    [[nodiscard]]
+    constexpr auto atan2(const auto& y) const
+        requires std::is_arithmetic_v<std::remove_cvref_t<decltype(y)>>
+    {
+        using CT = std::common_type_t<T, std::remove_cvref_t<decltype(y)>>;
+        if (std::isnan(y))
+        {
+            throw std::invalid_argument(std::format("y is {}", y));
+        }
+        return NotNaN<CT> {std::atan2(static_cast<CT>(m_value), static_cast<CT>(y))};
+    }
+
+    template <typename F>
+    [[nodiscard]]
+    constexpr auto atan2(const NotNaN<F>& y) const
+    {
+        using CT = std::common_type_t<T, F>;
+        return NotNaN<CT> {std::atan2(static_cast<CT>(m_value), static_cast<CT>(y))};
+    }
+
+    [[nodiscard]]
+    constexpr auto hypot(const auto& y) const
+        requires std::is_arithmetic_v<std::remove_cvref_t<decltype(y)>>
+    {
+        using CT = std::common_type_t<T, std::remove_cvref_t<decltype(y)>>;
+        if (std::isnan(y))
+        {
+            throw std::invalid_argument(std::format("y is {}", y));
+        }
+        return NotNaN<CT> {std::hypot(static_cast<CT>(m_value), static_cast<CT>(y))};
+    }
+
+    template <typename F>
+    [[nodiscard]]
+    constexpr auto hypot(const NotNaN<F>& y) const
+    {
+        using CT = std::common_type_t<T, F>;
+        return NotNaN<CT> {std::hypot(static_cast<CT>(m_value), static_cast<CT>(y))};
+    }
+
+    // error function and complementary error function
+    [[nodiscard]]
+    constexpr auto erf() const -> NotNaN
+    {
+        return NotNaN(std::erf(m_value));
+    }
+    [[nodiscard]]
+    constexpr auto erfc() const -> NotNaN
+    {
+        return NotNaN {std::erfc(m_value)};
+    }
+
+    // gamma
+    [[nodiscard]]
+    constexpr auto tgamma() const -> NotNaN
+    {
+        return NotNaN {std::tgamma(m_value)};
+    }
+    [[nodiscard]]
+    constexpr auto lgamma() const -> NotNaN
+    {
+        return NotNaN {std::lgamma(m_value)};
+    }
+
+    // midpoint
+    [[nodiscard]]
+    constexpr auto midpoint(const auto& rhs) const
+        requires std::is_arithmetic_v<std::remove_cvref_t<decltype(rhs)>>
+    {
+        using CT = std::common_type_t<T, std::remove_cvref_t<decltype(rhs)>>;
+        if (std::isnan(rhs))
+        {
+            throw std::invalid_argument(std::format("rhs is {}", rhs));
+        }
+        return NotNaN<CT> {std::midpoint(static_cast<CT>(m_value), static_cast<CT>(rhs))};
+    }
+
+    template <typename F>
+    [[nodiscard]]
+    constexpr auto midpoint(const NotNaN<F>& rhs) const
+    {
+        using CT = std::common_type_t<T, F>;
+        return NotNaN<CT> {std::midpoint(static_cast<CT>(m_value), static_cast<CT>(rhs))};
     }
 
     // Stream operators

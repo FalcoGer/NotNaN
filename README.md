@@ -23,6 +23,7 @@ All standard operations are available with both NotNaN types and built-in arithm
 - Comparisons: `<`, `<=`, `>`, `>=`, `==`, `!=`. As ever, direct comparisons of floating point values with == need to be done with care.
 - Conversions: Use `static_cast` to convert to another NotNaN type (for example `NotNaN<float>` to `NotNaN<double>`) or to a built-in arithmetic type (for example `int` or `bool`)
 - Dereference: Use the dereference operator `*` to get a copy of the value. This is not a reference, as to avoid being able to assign to it, possibly giving it the NaN value.
+- Math operations from cmath as member functions. They will throw if the result is NaN: `.sqrt`, `.cbrt`, `.log10`, `.exp2`, `sin`, etc. `.logBase(base)` for convenience. Also `.midpoint(other)`.
 
 Streaming operations:
 - `ostream << NotNaN`, behaves as with float.
