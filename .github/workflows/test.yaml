@@ -21,22 +21,6 @@ jobs:
     - name: Install Catch2
       run: sudo apt-get install -y catch2
 
-    # Install GCC 15
-    - name: Set up GCC 15
-      run: |
-        # Add repository to get the latest version of GCC
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        sudo apt-get update
-        sudo apt-get install -y gcc-15 g++-15
-
-        # Set GCC 15 as the default
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
-
-        # Verify the installed GCC version
-        gcc --version
-        g++ --version
-
     # Install ninja generator
     - name: Install Ninja
       run: sudo apt-get install -y ninja-build
