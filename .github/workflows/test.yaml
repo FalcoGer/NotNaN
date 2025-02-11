@@ -21,6 +21,10 @@ jobs:
     - name: Install Catch2
       run: sudo apt-get install -y catch2
 
+    # Install ninja generator
+    - name: Install Catch2
+      run: sudo apt-get install -y ninja
+
     # Build Project
     - name: Build Project
       uses: threeal/cmake-action@v2.1.0
