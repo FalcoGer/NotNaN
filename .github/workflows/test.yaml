@@ -33,8 +33,7 @@ jobs:
         cxx-compiler: g++
         build-dir: out/build/gcc
 
-    # Run the tests using CTest
-    - name: Run Tests
-      run: |
-        cd out/build/gcc
-        ctest --output-on-failure
+    # Run Tests
+    - name: Test Project
+      uses: threeal/ctest-action@v1.1.0
+
