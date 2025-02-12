@@ -27,7 +27,7 @@ auto main() -> int
     const float  INF = std::numeric_limits<float>::infinity();
     NotNaN f4 {INF};
     std::cout << std::format("{}", f4) << '\n';
-
+    NotNaN<double> f6{42};
     try
     {
         auto f5 = f4 - f4;
