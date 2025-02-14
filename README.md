@@ -41,8 +41,8 @@ All functions marked `noexcept` should not throw. Conversely, those not marked `
 For example operator+ may throw:
 
 ```cpp
-NotNaN x{std::numeric_limits<float>::infinity()}; // OK
-NotNaN y{-std::numeric_limits<float>::infinity()} // OK
+NotNaN x{std::numeric_limits<float>::infinity()};  // OK
+NotNaN y{-std::numeric_limits<float>::infinity()}; // OK
 NotNaN z = x + y; // will throw std::runtime_error
 ```
 
